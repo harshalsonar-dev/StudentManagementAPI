@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using StudentManagementSystem.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -8,50 +10,115 @@ using System.Text;
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
+    private readonly UserManager<IdentityUser> _userManager;
+    private readonly SignInManager<IdentityUser> _signInManager;
     private readonly IConfiguration _config;
 
-    public AuthController(IConfiguration config)
+    public AuthController(
+        UserManager<IdentityUser> userManager,
+        SignInManager<IdentityUser> signInManager,
+        IConfiguration config)
     {
+        _userManager = userManager;
+        _signInManager = signInManager;
         _config = config;
     }
 
-    [HttpPost("login")]
-    public IActionResult Login()
+    [HttpPost("register")]
+    public async Task<IActionResult> Register(RegisterRequest request)
     {
-        try
+        var email = request.Email.Trim();
+
+        var user = new IdentityUser
         {
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.Name, "admin")
-            };
+            UserName = email,
+            Email = email
+        };
 
-            var keyString = _config["Jwt:Key"];
+        var result = await _userManager.CreateAsync(user, request.Password);
 
-            // 🔥 DEBUG CHECK
-            if (string.IsNullOrEmpty(keyString))
+        if (!result.Succeeded)
+        {
+            return BadRequest(new
             {
-                return StatusCode(500, "JWT Key is NULL. Check appsettings.json");
+                errors = result.Errors.Select(e => e.Description)
+            });
+        }
+
+        return Ok(new { message = "User registered successfully." });
+    }
+
+    [HttpPost("login")]
+    public async Task<IActionResult> Login(LoginRequest request)
+    {
+        var user = await _userManager.FindByEmailAsync(
+            request.Email.Trim());
+
+        if (user == null)
+        {
+            return Unauthorized(new {
+                message = "Invalid email or password."
+            });
+        }
+
+        var result = await _signInManager.CheckPasswordSignInAsync(
+            user, request.Password, lockoutOnFailure: true);
+
+        if (!result.Succeeded)
+        {
+            return Unauthorized(new {
+                message = "Invalid email or password."
+            });
+        }
+
+        var token = GenerateJwtToken(user);
+
+        return Ok(new
+        {
+            message = "Login successful.",
+            token,
+            user = new
+            {
+                user.Id,
+                user.Email,
+                user.UserName
             }
+        });
+    }
 
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(keyString));
+    private string GenerateJwtToken(IdentityUser user)
+    {
+        var key = _config["Jwt:Key"]
+            ?? throw new InvalidOperationException(
+                "JWT signing key is not configured.");
 
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var issuer = _config["Jwt:Issuer"]
+            ?? throw new InvalidOperationException(
+                "JWT issuer is not configured.");
 
-            var token = new JwtSecurityToken(
-                issuer: _config["Jwt:Issuer"],
-                audience: _config["Jwt:Issuer"],
-                claims: claims,
-                expires: DateTime.Now.AddHours(1),
-                signingCredentials: creds);
-
-            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
-
-            return Ok(new { token = tokenString });
-        }
-        catch (Exception ex)
+        var claims = new[]
         {
-            return StatusCode(500, ex.Message);
-        }
+            new Claim(ClaimTypes.NameIdentifier, user.Id),
+            new Claim(ClaimTypes.Name, user.UserName ?? user.Email!),
+            new Claim(ClaimTypes.Email, user.Email ?? string.Empty),
+            new Claim(JwtRegisteredClaimNames.Jti,
+                Guid.NewGuid().ToString())
+        };
+
+        var securityKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(key));
+
+        var credentials = new SigningCredentials(
+            securityKey, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: issuer,
+            audience: issuer,
+            claims: claims,
+            notBefore: DateTime.UtcNow,
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 }
