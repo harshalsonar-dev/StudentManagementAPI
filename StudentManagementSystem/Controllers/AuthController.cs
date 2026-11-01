@@ -96,6 +96,10 @@ public class AuthController : ControllerBase
             ?? throw new InvalidOperationException(
                 "JWT issuer is not configured.");
 
+        var audience = _config["Jwt:Audience"]
+            ?? throw new InvalidOperationException(
+                "JWT audience is not configured.");
+
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id),
@@ -113,7 +117,7 @@ public class AuthController : ControllerBase
 
         var token = new JwtSecurityToken(
             issuer: issuer,
-            audience: issuer,
+            audience: audience,
             claims: claims,
             notBefore: DateTime.UtcNow,
             expires: DateTime.UtcNow.AddHours(1),
