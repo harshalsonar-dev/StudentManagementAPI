@@ -1,3 +1,21 @@
+## Visual Studio / VS Code
 .vs/
-bin/
-obj/
+.vscode/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+## Build results
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Test results
+TestResults/
+[Tt]est[Rr]esult*/
+
+## User secrets & OS files
+.DS_Store
+Thumbs.db

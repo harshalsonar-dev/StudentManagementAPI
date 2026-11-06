@@ -1,0 +1,205 @@
+@HostAddress = http://localhost:5000/api/v1
+@adminToken = {{loginAdmin.response.body.data.accessToken}}
+@refreshToken = {{loginAdmin.response.body.data.refreshToken}}
+
+### ==========================================================================
+### 1. AUTHENTICATION & SECURITY (JWT + Refresh Tokens + RBAC)
+### ==========================================================================
+
+### 1.1 Login as Default Admin (Seeded on Startup)
+# @name loginAdmin
+POST {{HostAddress}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@studententerprise.com",
+  "password": "EnterpriseAdmin@2026!"
+}
+
+###
+
+### 1.2 Register a Teacher (Assigns "Teacher" Role)
+POST {{HostAddress}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "prof.joshi@enterprise.edu",
+  "password": "TeacherPassword@2026!",
+  "fullName": "Prof. Arvind Joshi",
+  "role": "Teacher"
+}
+
+###
+
+### 1.3 Register a Student User (Default Role)
+POST {{HostAddress}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "sachin.tendulkar@enterprise.edu",
+  "password": "StudentPassword@2026!",
+  "fullName": "Sachin Tendulkar",
+  "role": "Student"
+}
+
+###
+
+### 1.4 Login as Teacher
+# @name loginTeacher
+POST {{HostAddress}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "prof.joshi@enterprise.edu",
+  "password": "TeacherPassword@2026!"
+}
+
+###
+
+### 1.5 Token Rotation: Refresh Token using Expired/Active Access Token + Refresh Token
+POST {{HostAddress}}/auth/refresh-token
+Content-Type: application/json
+
+{
+  "accessToken": "{{adminToken}}",
+  "refreshToken": "{{refreshToken}}"
+}
+
+###
+
+### 1.6 Revoke Refresh Token
+POST {{HostAddress}}/auth/revoke-token
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+###
+
+### 1.7 Get Current Authenticated Profile
+GET {{HostAddress}}/auth/me
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+### 1.8 Get All Enterprise Roles (Admin Only)
+GET {{HostAddress}}/auth/roles
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+### ==========================================================================
+### 2. CQRS & REPOSITORY CRUD (Students)
+### ==========================================================================
+
+### 2.1 Get Paged Students (Page 1, Size 5, Sort by Name Ascending)
+GET {{HostAddress}}/students?pageNumber=1&pageSize=5&sortBy=Name&isAscending=true
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+### 2.2 Search & Filter Students (Search "Deshmukh", Course "Computer Science")
+GET {{HostAddress}}/students?searchTerm=Deshmukh&course=Computer%20Science
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+### 2.3 Get Student Statistics by Course
+GET {{HostAddress}}/students/statistics
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+### 2.4 Get Student by ID
+GET {{HostAddress}}/students/1
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+### 2.5 Create Student (Admin / Teacher Only)
+POST {{HostAddress}}/students
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Neha Kulkarni",
+  "email": "neha.kulkarni@enterprise.edu",
+  "age": 21,
+  "course": "Artificial Intelligence",
+  "phoneNumber": "+91 9988776655"
+}
+
+###
+
+### 2.6 Update Student (Admin / Teacher Only)
+PUT {{HostAddress}}/students/1
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Amit Deshmukh (Lead Developer)",
+  "email": "amit.deshmukh@enterprise.edu",
+  "age": 22,
+  "course": "Cloud Computing",
+  "phoneNumber": "+91 9876543210",
+  "isActive": true
+}
+
+###
+
+### 2.7 Delete Student (Admin Only)
+DELETE {{HostAddress}}/students/3
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+### ==========================================================================
+### 3. EDGE / NEGATIVE CASES TESTING
+### ==========================================================================
+
+### 3.1 [Negative] 400 Bad Request - FluentValidation Failure (Invalid Email & Negative Age)
+POST {{HostAddress}}/students
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "A",
+  "email": "invalid-email-string",
+  "age": -5,
+  "course": ""
+}
+
+###
+
+### 3.2 [Negative] 401 Unauthorized - Missing Token
+GET {{HostAddress}}/students/1
+Accept: application/json
+
+###
+
+### 3.3 [Negative] 404 Not Found - Non-Existent Record
+GET {{HostAddress}}/students/999999
+Authorization: Bearer {{adminToken}}
+Accept: application/json
+
+###
+
+### 3.4 [Negative] 409 Conflict - Duplicate Email on Create
+POST {{HostAddress}}/students
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Duplicate Student",
+  "email": "amit.deshmukh@enterprise.edu",
+  "age": 22,
+  "course": "Computer Science"
+}

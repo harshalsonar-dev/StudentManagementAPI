@@ -1,49 +1,61 @@
-using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
+using StudentManagementSystem.DTOs.Common;
 
-public class ExceptionMiddleware
+namespace StudentManagementSystem.Middleware
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<ExceptionMiddleware> _logger;
-
-    public ExceptionMiddleware(
-        RequestDelegate next,
-        ILogger<ExceptionMiddleware> logger)
+    public class ExceptionMiddleware
     {
-        _next = next;
-        _logger = logger;
-    }
+        private readonly RequestDelegate _next;
+        private readonly ILogger<ExceptionMiddleware> _logger;
+        private readonly IHostEnvironment _env;
 
-    public async Task Invoke(HttpContext context)
-    {
-        try
+        public ExceptionMiddleware(
+            RequestDelegate next,
+            ILogger<ExceptionMiddleware> logger,
+            IHostEnvironment env)
         {
-            await _next(context);
+            _next = next;
+            _logger = logger;
+            _env = env;
         }
-        catch (Exception ex)
+
+        public async Task Invoke(HttpContext context)
         {
-            _logger.LogError(
-                ex,
-                "An unhandled exception occurred while processing the request.");
-
-            if (context.Response.HasStarted)
+            try
             {
-                throw;
+                await _next(context);
             }
-
-            context.Response.Clear();
-            context.Response.StatusCode =
-                StatusCodes.Status500InternalServerError;
-
-            context.Response.ContentType = "application/problem+json";
-
-            var problem = new ProblemDetails
+            catch (Exception ex)
             {
-                Status = StatusCodes.Status500InternalServerError,
-                Title = "An unexpected server error occurred.",
-                Detail = "Please try again later."
-            };
+                _logger.LogError(ex, "Unhandled exception occurred: {Message}", ex.Message);
 
-            await context.Response.WriteAsJsonAsync(problem);
+                if (context.Response.HasStarted)
+                {
+                    _logger.LogWarning("The response has already started, cannot write error response.");
+                    throw;
+                }
+
+                context.Response.Clear();
+                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                context.Response.ContentType = "application/json";
+
+                var errorMessage = _env.IsDevelopment()
+                    ? ex.Message
+                    : "An unexpected internal server error occurred. Please try again later.";
+
+                var response = ApiResponse<string>.FailureResult(
+                    errorMessage,
+                    _env.IsDevelopment() && ex.StackTrace != null
+                        ? new[] { ex.StackTrace }
+                        : null);
+
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+
+                await context.Response.WriteAsync(JsonSerializer.Serialize(response, jsonOptions));
+            }
         }
     }
 }

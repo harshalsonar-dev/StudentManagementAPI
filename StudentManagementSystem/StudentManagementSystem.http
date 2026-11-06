@@ -1,6 +1,146 @@
 @StudentManagementSystem_HostAddress = http://localhost:5211
+@authToken = {{loginAdmin.response.body.data.token}}
 
-GET {{StudentManagementSystem_HostAddress}}/weatherforecast/
+### -------------------------------------------------------------
+### 1. AUTHENTICATION & IDENTITY ENDPOINTS
+### -------------------------------------------------------------
+
+### Login as Default Admin
+# @name loginAdmin
+POST {{StudentManagementSystem_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@studentapi.com",
+  "password": "Admin@123456"
+}
+
+###
+
+### Register a New User (Teacher)
+POST {{StudentManagementSystem_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "teacher1@studentapi.com",
+  "password": "Teacher@123456",
+  "fullName": "Prof. Arvind Joshi",
+  "role": "Teacher"
+}
+
+###
+
+### Login as Teacher
+# @name loginTeacher
+POST {{StudentManagementSystem_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "teacher1@studentapi.com",
+  "password": "Teacher@123456"
+}
+
+###
+
+### Get Current User Profile (Admin)
+GET {{StudentManagementSystem_HostAddress}}/api/auth/me
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+###
+
+### Get Available Roles (Admin only)
+GET {{StudentManagementSystem_HostAddress}}/api/auth/roles
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+###
+
+### Assign Role to User (Admin only)
+POST {{StudentManagementSystem_HostAddress}}/api/auth/assign-role
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "email": "teacher1@studentapi.com",
+  "role": "Admin"
+}
+
+###
+
+### -------------------------------------------------------------
+### 2. STUDENT MANAGEMENT ENDPOINTS
+### -------------------------------------------------------------
+
+### Get All Students (Default Paging)
+GET {{StudentManagementSystem_HostAddress}}/api/student
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+###
+
+### Search and Filter Students (Page 1, Size 5, Search "Rahul")
+GET {{StudentManagementSystem_HostAddress}}/api/student?pageNumber=1&pageSize=5&searchTerm=Rahul&sortBy=Name&isAscending=true
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+###
+
+### Filter Students by Course ("Computer Science")
+GET {{StudentManagementSystem_HostAddress}}/api/student?course=Computer%20Science
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+###
+
+### Get Student Statistics (Count by Course)
+GET {{StudentManagementSystem_HostAddress}}/api/student/statistics
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+###
+
+### Get Student by ID
+GET {{StudentManagementSystem_HostAddress}}/api/student/1
+Authorization: Bearer {{authToken}}
+Accept: application/json
+
+###
+
+### Add New Student (Admin / Teacher only)
+POST {{StudentManagementSystem_HostAddress}}/api/student
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Tanvi Gaikwad",
+  "email": "tanvi.gaikwad@example.com",
+  "age": 21,
+  "course": "Artificial Intelligence",
+  "phoneNumber": "+91 9123456789"
+}
+
+###
+
+### Update Existing Student (Admin / Teacher only)
+PUT {{StudentManagementSystem_HostAddress}}/api/student/1
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "name": "Rahul Sharma (Updated)",
+  "email": "rahul.sharma@example.com",
+  "age": 22,
+  "course": "Data Science",
+  "phoneNumber": "+91 9876543299",
+  "isActive": true
+}
+
+###
+
+### Delete Student by ID (Admin only)
+DELETE {{StudentManagementSystem_HostAddress}}/api/student/4
+Authorization: Bearer {{authToken}}
 Accept: application/json
 
 ###

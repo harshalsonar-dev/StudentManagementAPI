@@ -1,10 +1,15 @@
-﻿using StudentManagementSystem.Models;
+using StudentManagementSystem.DTOs.Common;
+using StudentManagementSystem.DTOs.Students;
 
-public interface IStudentService
+namespace StudentManagementSystem.Services
 {
-    Task<List<Student>> GetAll();
-    Task<Student> GetById(int id);
-    Task Add(Student student);
-    Task Update(Student student);
-    Task Delete(int id);
+    public interface IStudentService
+    {
+        Task<ApiResponse<PagedResult<StudentResponseDto>>> GetAllAsync(StudentQueryParameters queryParams);
+        Task<ApiResponse<StudentResponseDto>> GetByIdAsync(int id);
+        Task<ApiResponse<StudentResponseDto>> AddAsync(StudentCreateDto dto);
+        Task<ApiResponse<StudentResponseDto>> UpdateAsync(int id, StudentUpdateDto dto);
+        Task<ApiResponse<bool>> DeleteAsync(int id);
+        Task<ApiResponse<Dictionary<string, int>>> GetStatisticsAsync();
+    }
 }
