@@ -1,139 +1,192 @@
-# Student Management API 🎓 (.NET 8 Web API)
+# Student Management Enterprise API 🎓 (.NET 8 Web API)
 
-हा एक संपूर्ण (Production-Ready) आणि मॉडर्न **Student Management Web API** प्रोजेक्ट आहे, जो **ASP.NET Core 8**, **Entity Framework Core**, **SQL Server**, **ASP.NET Core Identity**, आणि **JWT Bearer Authentication** चा वापर करून तयार करण्यात आला आहे.
-
----
-
-## 🌟 वैशिष्ट्ये (Key Features)
-
-1. **Clean Architecture (3-Tier Structure)**:
-   - **Controllers**: API Endpoints आणि HTTP Request/Response व्यवस्थापन.
-   - **Services**: Business Logic, Validation, आणि DTO Mapping.
-   - **Repositories**: Database Data Access Logic (EF Core सह).
-   - **Data Transfer Objects (DTOs)**: सुरक्षित डेटा देवाणघेवाण, Entities थेट बाहेरील युजर्सना दाखवले जात नाहीत.
-
-2. **Security & Authentication**:
-   - **ASP.NET Core Identity**: युजर रजिस्ट्रेशन, पासवर्ड हॅशिंग, आणि लॉकआउट पॉलिसी (5 अयशस्वी प्रयत्नांनंतर 5 मिनिटे लॉक).
-   - **JWT Authentication**: JSON Web Tokens वापरून सुरक्षित ऑथेंटिकेशन.
-   - **Role-Based Access Control (RBAC)**:
-     - `Admin`: सर्व अधिकार (विद्यार्थी Delete करणे, नवीन Role देणे, सर्व माहिती पाहणे).
-     - `Teacher`: विद्यार्थी Add व Update करण्याचे अधिकार.
-     - `Student`: विद्यार्थी माहिती व प्रोफाइल पाहण्याचे अधिकार.
-
-3. **Student Management CRUD**:
-   - सर्व विद्यार्थी पाहणे (Pagination, Search, Course Filter, Sorting सह).
-   - एका विद्यार्थ्याची माहिती ID द्वारे मिळवणे (`GET /api/student/{id}`).
-   - नवीन विद्यार्थी जोडणे (`POST /api/student`) - युनिक ईमेल व्हेरिफिकेशन सह.
-   - विद्यार्थ्याची माहिती अपडेट करणे (`PUT /api/student/{id}`).
-   - विद्यार्थी डिलीट करणे (`DELETE /api/student/{id}`).
-   - कोर्सनुसार विद्यार्थ्यांची आकडेवारी (`GET /api/student/statistics`).
-
-4. **Global Exception Handling**:
-   - `ExceptionMiddleware` द्वारे कोणत्याही अनपेक्षित त्रुटीचे सुरक्षित आणि व्यवस्थित JSON एरर फॉरमॅटमध्ये रूपांतर.
-
-5. **Swagger / OpenAPI Documentation**:
-   - रूट URL वर (`http://localhost:5211/`) संपूर्ण स्वॅगर UI उपलब्ध, जिथे 'Authorize' बटण वापरून थेट JWT टोकन टेस्ट करता येते.
+A production-ready, highly secure, and scalable **Enterprise REST API** for Student Management, built with **C#**, **.NET 8**, **Clean Architecture**, **CQRS with MediatR**, **Entity Framework Core**, **SQL Server**, **ASP.NET Core Identity**, and **JWT Authentication with Refresh Tokens**.
 
 ---
 
-## 🔑 Default Admin Credentials (डिफ़ॉल्ट लॉगिन)
+## 🌟 Key Features
 
-प्रोजेक्ट पहिल्यांदा रन होताच सिस्टीममध्ये डिफ़ॉल्ट Admin युजर आपोआप तयार केला जातो:
+### 1. Clean Architecture & CQRS
+- **Domain Layer**: Core domain models, base entity abstraction, enums, exceptions, and repository interfaces. Pure C# with zero external dependencies.
+- **Application Layer**: CQRS commands and queries using **MediatR**, validation via **FluentValidation**, MediatR pipeline behaviors (logging and automatic validation), DTOs, and interface contracts.
+- **Infrastructure Layer**: EF Core database context, migrations, Generic Repository implementation, Unit of Work with transaction management, ASP.NET Core Identity integration, and cryptographic JWT/Refresh Token services.
+- **API Layer**: Clean controllers inheriting from `ApiControllerBase`, global exception handling middleware, enterprise rate limiting, Serilog logging configuration, and interactive Swagger/OpenAPI documentation.
+
+### 2. Enterprise-Grade Security
+- **JWT + Refresh Tokens**: Short-lived access tokens (15 minutes) signed with HMAC-SHA256, paired with secure 64-byte cryptographic refresh tokens (7 days).
+- **Token Rotation & Theft Detection**: Refresh tokens are rotated upon each renewal. If a previously revoked token is reused, all active tokens for that user are immediately revoked to protect against session hijacking.
+- **Role-Based Access Control (RBAC)**: Fine-grained authorization based on user roles (`Admin`, `Teacher`, `Student`).
+- **Identity Password & Lockout Policy**: Enforces strict password complexity (minimum 8 characters, uppercase, lowercase, digit, and symbol) and temporarily locks out accounts after 5 failed login attempts for 5 minutes.
+- **Rate Limiting**: .NET 8 fixed-window rate limiters protecting against denial-of-service and brute-force attacks (10 req/min on authentication endpoints, 100 req/min for general API calls).
+- **CORS**: Configurable cross-origin policies for secure frontend integration (React, Angular, Vue, etc.).
+
+### 3. Robust Data Management & Performance
+- **Server-Side Pagination, Filtering & Sorting**: Supports pagination (`pageNumber`, `pageSize`), multi-field search (`searchTerm`), category filtering (`course`, `isActive`), and dynamic multi-column sorting (`sortBy`, `isAscending`).
+- **Generic Repository & Unit of Work**: Clean data access abstraction supporting transactional consistency and query decoupling.
+- **Duplicate Prevention**: Enforces database-level unique constraints and application-level pre-validation on email addresses.
+
+### 4. Logging & Diagnostics
+- **Structured Logging (Serilog)**: Colorful console logging and daily rolling file logs (`logs/student-api-.log`) with 14-day retention.
+- **MediatR Pipeline Logging**: Automatically tracks and logs the execution duration of every command and query.
+
+### 5. Standardized Error Handling
+- **Global Exception Middleware**: Intercepts unhandled exceptions and validation errors, transforming them into standardized `ApiResponse<T>` envelopes with appropriate HTTP status codes (`400`, `401`, `403`, `404`, `409`, `500`). Production error details are sanitized to prevent leaking sensitive infrastructure info.
+
+---
+
+## 🔑 Default Admin Credentials
+
+When the API launches, the database is automatically migrated and seeded with default roles and an administrator account:
 
 | Parameter | Value |
-|-----------|-------|
-| **Email** | `admin@studentapi.com` |
-| **Password** | `Admin@123456` |
+|---|---|
+| **Email** | `admin@studententerprise.com` |
+| **Password** | `EnterpriseAdmin@2026!` |
 | **Role** | `Admin` |
 
 ---
 
-## 📁 प्रोजेक्ट स्ट्रक्चर (Project Structure)
+## 📁 Solution Structure
 
 ```
 StudentManagementAPI/
 │
-├── StudentManagementSystem/
-│   ├── Controllers/
-│   │   ├── AuthController.cs          # Register, Login, Me, Roles, Assign-Role
-│   │   └── StudentController.cs       # Student CRUD & Stats
-│   ├── Data/
-│   │   ├── AppDbContext.cs            # IdentityDbContext & EF Core Mapping
-│   │   └── DbInitializer.cs           # Database Seeder (Roles, Admin, Sample Data)
-│   ├── DTOs/
-│   │   ├── Common/                    # ApiResponse<T>, PagedResult<T>
-│   │   ├── Students/                  # CreateDto, UpdateDto, ResponseDto, QueryParams
-│   │   └── Auth/                      # AuthResponseDto, AssignRoleDto
-│   ├── Middleware/
-│   │   └── ExceptionMiddleware.cs     # Centralized Exception Handler
-│   ├── Migrations/                    # EF Core Migrations
-│   ├── Models/
-│   │   ├── Student.cs                 # Student Entity
-│   │   ├── LoginRequest.cs            # Login Model
-│   │   └── RegisterRequest.cs         # Register Model
-│   ├── Repositories/
-│   │   ├── IStudentRepository.cs
-│   │   └── StudentRepository.cs
-│   ├── Services/
-│   │   ├── IStudentService.cs
-│   │   └── StudentService.cs
-│   ├── appsettings.json               # Database Connection & JWT Configuration
-│   ├── Program.cs                     # App Startup & Dependency Injection
-│   ├── StudentManagementSystem.csproj
-│   └── StudentManagementSystem.http   # Ready-to-use HTTP Requests for Testing
-└── README.md
+├── src/
+│   ├── StudentManagement.Domain/                 # Core domain entities, enums, exceptions, interfaces
+│   │   ├── Common/BaseEntity.cs
+│   │   ├── Entities/Student.cs, RefreshToken.cs
+│   │   ├── Enums/AppRoles.cs
+│   │   ├── Exceptions/DomainExceptions.cs
+│   │   └── Interfaces/IGenericRepository.cs, IStudentRepository.cs, IUnitOfWork.cs
+│   │
+│   ├── StudentManagement.Application/            # CQRS commands, queries, validators, DTOs, pipeline behaviors
+│   │   ├── Common/
+│   │   │   ├── Behaviors/ValidationBehavior.cs, LoggingBehavior.cs
+│   │   │   └── Models/ApiResponse.cs, PagedResult.cs, PaginationParameters.cs
+│   │   ├── DTOs/Auth/AuthDtos.cs, Students/StudentDtos.cs
+│   │   ├── Features/
+│   │   │   ├── Auth/Commands (Login, Register, RefreshToken, RevokeToken)
+│   │   │   └── Students/ (Commands: Create, Update, Delete | Queries: Paged, ById, Stats)
+│   │   └── Interfaces/ITokenService.cs, IIdentityService.cs
+│   │
+│   ├── StudentManagement.Infrastructure/         # EF Core, Identity, JWT, Repositories, Migrations
+│   │   ├── Data/ApplicationDbContext.cs, DbSeeder.cs
+│   │   ├── Identity/ApplicationUser.cs
+│   │   ├── Migrations/
+│   │   ├── Repositories/GenericRepository.cs, StudentRepository.cs, UnitOfWork.cs
+│   │   └── Services/IdentityService.cs, TokenService.cs
+│   │
+│   └── StudentManagement.API/                    # Web API host, controllers, middleware, Swagger, rate limiting
+│       ├── Controllers/ApiControllerBase.cs, AuthController.cs, StudentsController.cs
+│       ├── Extensions/RateLimitingExtensions.cs
+│       ├── Middleware/GlobalExceptionHandlingMiddleware.cs
+│       ├── Program.cs
+│       ├── appsettings.json
+│       └── StudentManagementEnterprise.http     # Complete ready-to-run REST test requests
+│
+├── tests/
+│   └── StudentManagement.UnitTests/              # 81 comprehensive unit tests (xUnit, Moq, FluentAssertions)
+│       ├── Features/Students/ (Create, Update, Delete, ById, Paged, Stats, Validators)
+│       ├── Features/Auth/ (Login, Register, RefreshToken, RevokeToken, TokenService, IdentityService)
+│       ├── Infrastructure/ (GenericRepository in-memory DB tests)
+│       └── Middleware/ (GlobalExceptionHandlingMiddleware tests)
+│
+└── StudentManagementSystem.sln
 ```
 
 ---
 
-## 🚀 हा प्रोजेक्ट कसा चालवावा (How to Run)
+## 📡 API Endpoints Reference
 
-### 1. Requirements:
+### 🔐 Authentication & Identity (`/api/v1/auth`)
+
+| HTTP Method | Route | Description | Authorization |
+|---|---|---|---|
+| `POST` | `/api/v1/auth/register` | Register a new user account (Student / Teacher) | Public |
+| `POST` | `/api/v1/auth/login` | Authenticate user; returns JWT Access & Refresh tokens | Public |
+| `POST` | `/api/v1/auth/refresh-token` | Exchange expired access token + refresh token for new pair | Public |
+| `POST` | `/api/v1/auth/revoke-token` | Revoke an active refresh token | Public |
+| `GET`  | `/api/v1/auth/me` | Retrieve profile and roles of authenticated user | `[Authorize]` |
+| `GET`  | `/api/v1/auth/roles` | List all available enterprise roles | `[Authorize(Roles="Admin")]` |
+| `POST` | `/api/v1/auth/assign-role` | Assign role (`Admin`, `Teacher`, `Student`) to user | `[Authorize(Roles="Admin")]` |
+
+### 👨‍🎓 Student Management (`/api/v1/students`)
+
+| HTTP Method | Route | Description | Authorization |
+|---|---|---|---|
+| `GET`    | `/api/v1/students` | Get paginated students (search, filter, sort) | `[Authorize]` |
+| `GET`    | `/api/v1/students/{id}` | Get student details by ID | `[Authorize]` |
+| `GET`    | `/api/v1/students/statistics` | Get student enrollment count grouped by course | `[Authorize]` |
+| `POST`   | `/api/v1/students` | Create a new student record | `[Authorize(Roles="Admin,Teacher")]` |
+| `PUT`    | `/api/v1/students/{id}` | Update an existing student record | `[Authorize(Roles="Admin,Teacher")]` |
+| `DELETE` | `/api/v1/students/{id}` | Delete a student record | `[Authorize(Roles="Admin")]` |
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+The project includes an automated test suite containing **81 unit tests** with **100% pass rate**:
+
+```
+Test Run Summary:
+========================================================================================
+Total Tests : 81
+Passed      : 81
+Failed      : 0
+Skipped     : 0
+Duration    : ~1.5s
+Framework   : xUnit, Moq, FluentAssertions, EF Core In-Memory
+========================================================================================
+```
+
+### Covered Test Categories:
+- **Positive CRUD Operations**: Successful create, retrieve, paged query, update, and delete.
+- **Negative & Edge Cases**:
+  - `400 Bad Request`: Payload validation failures (names, emails, age boundaries, phone regex, invalid roles).
+  - `401 Unauthorized`: Missing tokens, expired tokens, invalid credentials, account lockouts.
+  - `404 Not Found`: Non-existent entity queries and deletions.
+  - `409 Conflict`: Duplicate email handling on insert and update.
+  - `500 Server Error`: Graceful handling and sanitized problem details upon unexpected database or server faults.
+- **Security Tests**: Cryptographic token generation, token rotation, token reuse attack detection, and role verification.
+
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- SQL Server किंवा SQL Server LocalDB (`(localdb)\mssqllocaldb`)
+- SQL Server or SQL Server LocalDB (`(localdb)\mssqllocaldb`)
 
-### 2. Run Database Migrations:
-डेटाबेस व टेबल्स आधीच तयार करण्यात आले आहेत. तरीही मॅन्युअली अपडेट करायचे असल्यास:
-```powershell
-cd "StudentManagementSystem"
-dotnet ef database update
+### 2. Clone Repository
+```bash
+git clone https://github.com/harshalsonar-dev/StudentManagementAPI.git
+cd StudentManagementAPI
 ```
 
-### 3. Run Application:
+### 3. Run Database Migrations
+Migrations are applied automatically at startup. To run them manually via CLI:
 ```powershell
-dotnet run --project "StudentManagementSystem"
+dotnet ef database update --project "src/StudentManagement.Infrastructure" --startup-project "src/StudentManagement.API"
 ```
-किंवा Visual Studio / VS Code मध्ये `F5` दाबा.
 
-### 4. Swagger UI ओपन करा:
-ब्राउझरमध्ये उघडा:
-👉 **http://localhost:5211/** (किंवा https://localhost:7199/)
+### 4. Run the API Server
+```powershell
+dotnet run --project "src/StudentManagement.API"
+```
+
+### 5. Access Interactive Documentation
+Open your browser and navigate to:
+👉 **[http://localhost:5000](http://localhost:5000)** *(Swagger UI)*
+
+### 6. Run Automated Tests
+```powershell
+dotnet test
+```
+
+### 7. Direct HTTP File Testing
+You can execute pre-configured requests directly in VS Code (REST Client) or Visual Studio using [`StudentManagementEnterprise.http`](file:///e:/New%20folder/My_Project/StudentManagementAPI/src/StudentManagement.API/StudentManagementEnterprise.http).
 
 ---
 
-## 📡 मुख्य API Endpoints
-
-### 🔐 1. Authentication (`/api/auth`)
-| Method | Endpoint | Description | Permission |
-|--------|----------|-------------|------------|
-| `POST` | `/api/auth/register` | नवीन युजर नोंदणी करा | सार्वजनिक (Public) |
-| `POST` | `/api/auth/login` | लॉगिन करा आणि JWT Token मिळवा | सार्वजनिक (Public) |
-| `GET`  | `/api/auth/me` | लॉगिन केलेल्या युजरचे प्रोफाइल पहा | `[Authorize]` |
-| `GET`  | `/api/auth/roles` | सर्व उपलब्ध Roles ची यादी पहा | `[Authorize(Roles="Admin")]` |
-| `POST` | `/api/auth/assign-role`| युजरला नवीन Role द्या | `[Authorize(Roles="Admin")]` |
-
-### 👨‍🎓 2. Student Management (`/api/student`)
-| Method | Endpoint | Description | Permission |
-|--------|----------|-------------|------------|
-| `GET`  | `/api/student` | विद्यार्थ्यांची यादी (Paging, Filter, Search) | `[Authorize]` |
-| `GET`  | `/api/student/{id}` | विशिष्ट विद्यार्थ्याची माहिती मिळवा | `[Authorize]` |
-| `GET`  | `/api/student/statistics` | कोर्सनिहाय विद्यार्थ्यांची संख्या | `[Authorize]` |
-| `POST` | `/api/student` | नवीन विद्यार्थी ॲड करा | `[Authorize(Roles="Admin,Teacher")]` |
-| `PUT`  | `/api/student/{id}` | विद्यार्थ्यांची माहिती अपडेट करा | `[Authorize(Roles="Admin,Teacher")]` |
-| `DELETE`| `/api/student/{id}`| विद्यार्थी डिलीट करा | `[Authorize(Roles="Admin")]` |
-
----
-
-## 🧪 Testing with HTTP File
-प्रोजेक्टमधील `StudentManagementSystem.http` फाइल वापरून तुम्ही VS Code किंवा Visual Studio च्या REST Client द्वारे सर्व Endpoints थेट टेस्ट करू शकता.
-
+## 📄 License
+This project is open-source and available under the [MIT License](LICENSE).
