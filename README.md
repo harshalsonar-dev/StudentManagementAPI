@@ -1,192 +1,221 @@
-# Student Management Enterprise API 🎓 (.NET 8 Web API)
+# Student Management Enterprise API (.NET 8)
 
-A production-ready, highly secure, and scalable **Enterprise REST API** for Student Management, built with **C#**, **.NET 8**, **Clean Architecture**, **CQRS with MediatR**, **Entity Framework Core**, **SQL Server**, **ASP.NET Core Identity**, and **JWT Authentication with Refresh Tokens**.
-
----
-
-## 🌟 Key Features
-
-### 1. Clean Architecture & CQRS
-- **Domain Layer**: Core domain models, base entity abstraction, enums, exceptions, and repository interfaces. Pure C# with zero external dependencies.
-- **Application Layer**: CQRS commands and queries using **MediatR**, validation via **FluentValidation**, MediatR pipeline behaviors (logging and automatic validation), DTOs, and interface contracts.
-- **Infrastructure Layer**: EF Core database context, migrations, Generic Repository implementation, Unit of Work with transaction management, ASP.NET Core Identity integration, and cryptographic JWT/Refresh Token services.
-- **API Layer**: Clean controllers inheriting from `ApiControllerBase`, global exception handling middleware, enterprise rate limiting, Serilog logging configuration, and interactive Swagger/OpenAPI documentation.
-
-### 2. Enterprise-Grade Security
-- **JWT + Refresh Tokens**: Short-lived access tokens (15 minutes) signed with HMAC-SHA256, paired with secure 64-byte cryptographic refresh tokens (7 days).
-- **Token Rotation & Theft Detection**: Refresh tokens are rotated upon each renewal. If a previously revoked token is reused, all active tokens for that user are immediately revoked to protect against session hijacking.
-- **Role-Based Access Control (RBAC)**: Fine-grained authorization based on user roles (`Admin`, `Teacher`, `Student`).
-- **Identity Password & Lockout Policy**: Enforces strict password complexity (minimum 8 characters, uppercase, lowercase, digit, and symbol) and temporarily locks out accounts after 5 failed login attempts for 5 minutes.
-- **Rate Limiting**: .NET 8 fixed-window rate limiters protecting against denial-of-service and brute-force attacks (10 req/min on authentication endpoints, 100 req/min for general API calls).
-- **CORS**: Configurable cross-origin policies for secure frontend integration (React, Angular, Vue, etc.).
-
-### 3. Robust Data Management & Performance
-- **Server-Side Pagination, Filtering & Sorting**: Supports pagination (`pageNumber`, `pageSize`), multi-field search (`searchTerm`), category filtering (`course`, `isActive`), and dynamic multi-column sorting (`sortBy`, `isAscending`).
-- **Generic Repository & Unit of Work**: Clean data access abstraction supporting transactional consistency and query decoupling.
-- **Duplicate Prevention**: Enforces database-level unique constraints and application-level pre-validation on email addresses.
-
-### 4. Logging & Diagnostics
-- **Structured Logging (Serilog)**: Colorful console logging and daily rolling file logs (`logs/student-api-.log`) with 14-day retention.
-- **MediatR Pipeline Logging**: Automatically tracks and logs the execution duration of every command and query.
-
-### 5. Standardized Error Handling
-- **Global Exception Middleware**: Intercepts unhandled exceptions and validation errors, transforming them into standardized `ApiResponse<T>` envelopes with appropriate HTTP status codes (`400`, `401`, `403`, `404`, `409`, `500`). Production error details are sanitized to prevent leaking sensitive infrastructure info.
+An enterprise-grade RESTful API for student management built with C# and .NET 8, applying Clean Architecture, CQRS with MediatR, Entity Framework Core with SQL Server, ASP.NET Core Identity, and JWT authentication with cryptographic refresh tokens.
 
 ---
 
-## 🔑 Default Admin Credentials
+## Architecture Overview
 
-When the API launches, the database is automatically migrated and seeded with default roles and an administrator account:
+The solution adheres to Clean Architecture principles, ensuring clear separation of concerns, decoupling from frameworks, and high testability:
 
-| Parameter | Value |
+- **Domain Layer (`src/StudentManagement.Domain`)**
+  - Contains core business entities (`Student`, `RefreshToken`).
+  - Defines shared abstractions (`BaseEntity`), application roles (`AppRoles`), domain-specific exceptions, and repository contracts (`IStudentRepository`, `IGenericRepository`, `IUnitOfWork`).
+  - Free of external dependencies or framework couplings.
+
+- **Application Layer (`src/StudentManagement.Application`)**
+  - Implements CQRS command and query handlers via MediatR.
+  - Request validation using FluentValidation rules integrated directly into the pipeline (`ValidationBehavior`).
+  - Cross-cutting concerns such as performance and telemetry logging (`LoggingBehavior`).
+  - Standardized API envelope models (`ApiResponse<T>`), pagination structures (`PagedResult<T>`, `PaginationParameters`), and Data Transfer Objects (DTOs).
+
+- **Infrastructure Layer (`src/StudentManagement.Infrastructure`)**
+  - EF Core database context (`ApplicationDbContext`) and migrations.
+  - Implementation of Generic Repository and Unit of Work with transaction management.
+  - ASP.NET Core Identity integration (`IdentityService`) for secure password hashing and account lockout.
+  - Token service (`TokenService`) for HMAC-SHA256 JWT generation and secure 64-byte cryptographic refresh token rotation.
+  - Automated database migration and initial administrator seeding (`DbSeeder`).
+
+- **API Presentation Layer (`src/StudentManagement.API`)**
+  - Thin API controllers deriving from `ApiControllerBase`.
+  - Global exception middleware (`GlobalExceptionHandlingMiddleware`) providing uniform JSON responses across all status codes.
+  - Rate limiting policies (fixed-window limiters for authentication and general endpoints).
+  - Structured application logging with Serilog (Console and daily rolling file sinks).
+  - Interactive Swagger / OpenAPI documentation.
+
+---
+
+## Default Administrator Credentials
+
+Upon first startup, the database is automatically created and seeded with default roles and an administrator account:
+
+| Field | Value |
 |---|---|
 | **Email** | `admin@studententerprise.com` |
 | **Password** | `EnterpriseAdmin@2026!` |
-| **Role** | `Admin` |
+| **Assigned Role** | `Admin` |
 
 ---
 
-## 📁 Solution Structure
+## API Endpoints Reference
 
-```
-StudentManagementAPI/
-│
-├── src/
-│   ├── StudentManagement.Domain/                 # Core domain entities, enums, exceptions, interfaces
-│   │   ├── Common/BaseEntity.cs
-│   │   ├── Entities/Student.cs, RefreshToken.cs
-│   │   ├── Enums/AppRoles.cs
-│   │   ├── Exceptions/DomainExceptions.cs
-│   │   └── Interfaces/IGenericRepository.cs, IStudentRepository.cs, IUnitOfWork.cs
-│   │
-│   ├── StudentManagement.Application/            # CQRS commands, queries, validators, DTOs, pipeline behaviors
-│   │   ├── Common/
-│   │   │   ├── Behaviors/ValidationBehavior.cs, LoggingBehavior.cs
-│   │   │   └── Models/ApiResponse.cs, PagedResult.cs, PaginationParameters.cs
-│   │   ├── DTOs/Auth/AuthDtos.cs, Students/StudentDtos.cs
-│   │   ├── Features/
-│   │   │   ├── Auth/Commands (Login, Register, RefreshToken, RevokeToken)
-│   │   │   └── Students/ (Commands: Create, Update, Delete | Queries: Paged, ById, Stats)
-│   │   └── Interfaces/ITokenService.cs, IIdentityService.cs
-│   │
-│   ├── StudentManagement.Infrastructure/         # EF Core, Identity, JWT, Repositories, Migrations
-│   │   ├── Data/ApplicationDbContext.cs, DbSeeder.cs
-│   │   ├── Identity/ApplicationUser.cs
-│   │   ├── Migrations/
-│   │   ├── Repositories/GenericRepository.cs, StudentRepository.cs, UnitOfWork.cs
-│   │   └── Services/IdentityService.cs, TokenService.cs
-│   │
-│   └── StudentManagement.API/                    # Web API host, controllers, middleware, Swagger, rate limiting
-│       ├── Controllers/ApiControllerBase.cs, AuthController.cs, StudentsController.cs
-│       ├── Extensions/RateLimitingExtensions.cs
-│       ├── Middleware/GlobalExceptionHandlingMiddleware.cs
-│       ├── Program.cs
-│       ├── appsettings.json
-│       └── StudentManagementEnterprise.http     # Complete ready-to-run REST test requests
-│
-├── tests/
-│   └── StudentManagement.UnitTests/              # 81 comprehensive unit tests (xUnit, Moq, FluentAssertions)
-│       ├── Features/Students/ (Create, Update, Delete, ById, Paged, Stats, Validators)
-│       ├── Features/Auth/ (Login, Register, RefreshToken, RevokeToken, TokenService, IdentityService)
-│       ├── Infrastructure/ (GenericRepository in-memory DB tests)
-│       └── Middleware/ (GlobalExceptionHandlingMiddleware tests)
-│
-└── StudentManagementSystem.sln
-```
+### Authentication Endpoints (`/api/v1/auth`)
 
----
-
-## 📡 API Endpoints Reference
-
-### 🔐 Authentication & Identity (`/api/v1/auth`)
-
-| HTTP Method | Route | Description | Authorization |
+| Method | Endpoint | Description | Access Level |
 |---|---|---|---|
-| `POST` | `/api/v1/auth/register` | Register a new user account (Student / Teacher) | Public |
-| `POST` | `/api/v1/auth/login` | Authenticate user; returns JWT Access & Refresh tokens | Public |
-| `POST` | `/api/v1/auth/refresh-token` | Exchange expired access token + refresh token for new pair | Public |
-| `POST` | `/api/v1/auth/revoke-token` | Revoke an active refresh token | Public |
-| `GET`  | `/api/v1/auth/me` | Retrieve profile and roles of authenticated user | `[Authorize]` |
-| `GET`  | `/api/v1/auth/roles` | List all available enterprise roles | `[Authorize(Roles="Admin")]` |
-| `POST` | `/api/v1/auth/assign-role` | Assign role (`Admin`, `Teacher`, `Student`) to user | `[Authorize(Roles="Admin")]` |
+| `POST` | `/api/v1/auth/register` | Register a new user account | Public |
+| `POST` | `/api/v1/auth/login` | Authenticate with email and password | Public |
+| `POST` | `/api/v1/auth/refresh-token` | Renew access token using refresh token | Public |
+| `POST` | `/api/v1/auth/revoke-token` | Revoke a refresh token | Public |
+| `GET` | `/api/v1/auth/me` | Fetch profile information of the current user | Authenticated |
+| `GET` | `/api/v1/auth/roles` | List all system roles | Admin only |
+| `POST` | `/api/v1/auth/assign-role` | Assign role (`Admin`, `Teacher`, `Student`) to a user | Admin only |
 
-### 👨‍🎓 Student Management (`/api/v1/students`)
+### Student Management Endpoints (`/api/v1/students`)
 
-| HTTP Method | Route | Description | Authorization |
+| Method | Endpoint | Description | Access Level |
 |---|---|---|---|
-| `GET`    | `/api/v1/students` | Get paginated students (search, filter, sort) | `[Authorize]` |
-| `GET`    | `/api/v1/students/{id}` | Get student details by ID | `[Authorize]` |
-| `GET`    | `/api/v1/students/statistics` | Get student enrollment count grouped by course | `[Authorize]` |
-| `POST`   | `/api/v1/students` | Create a new student record | `[Authorize(Roles="Admin,Teacher")]` |
-| `PUT`    | `/api/v1/students/{id}` | Update an existing student record | `[Authorize(Roles="Admin,Teacher")]` |
-| `DELETE` | `/api/v1/students/{id}` | Delete a student record | `[Authorize(Roles="Admin")]` |
+| `GET` | `/api/v1/students` | Get paginated list of students with filtering and sorting | Authenticated |
+| `GET` | `/api/v1/students/{id}` | Retrieve single student by unique ID | Authenticated |
+| `GET` | `/api/v1/students/statistics` | Course-wise enrollment statistics | Authenticated |
+| `POST` | `/api/v1/students` | Register a new student record | Admin, Teacher |
+| `PUT` | `/api/v1/students/{id}` | Update student details | Admin, Teacher |
+| `DELETE` | `/api/v1/students/{id}` | Remove a student record | Admin only |
 
 ---
 
-## 🧪 Testing & Quality Assurance
+## Standardized Response Envelope
 
-The project includes an automated test suite containing **81 unit tests** with **100% pass rate**:
+All API endpoints return responses encapsulated in the unified `ApiResponse<T>` structure:
+
+### Success Response Example (`200 OK`)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Students retrieved successfully",
+  "data": {
+    "items": [
+      {
+        "id": 1,
+        "firstName": "John",
+        "lastName": "Doe",
+        "email": "john.doe@example.com",
+        "dateOfBirth": "2001-05-15",
+        "course": "Computer Science",
+        "enrollmentDate": "2024-09-01",
+        "isActive": true
+      }
+    ],
+    "pageNumber": 1,
+    "pageSize": 10,
+    "totalCount": 1,
+    "totalPages": 1,
+    "hasPreviousPage": false,
+    "hasNextPage": false
+  },
+  "errors": []
+}
+```
+
+### Validation Error Response Example (`400 Bad Request`)
+```json
+{
+  "success": false,
+  "statusCode": 400,
+  "message": "One or more validation errors occurred.",
+  "data": null,
+  "errors": [
+    "First name is required.",
+    "Invalid email format."
+  ]
+}
+```
+
+---
+
+## Quick Start & Usage Examples
+
+### 1. Authenticate & Obtain JWT Token
+
+```bash
+curl -X POST "http://localhost:5000/api/v1/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@studententerprise.com",
+    "password": "EnterpriseAdmin@2026!"
+  }'
+```
+
+### 2. Query Students (with Search, Filter, Sort & Pagination)
+
+```bash
+curl -X GET "http://localhost:5000/api/v1/students?pageNumber=1&pageSize=10&searchTerm=John&course=Computer%20Science&sortBy=LastName&isAscending=true" \
+  -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>"
+```
+
+### 3. Create a New Student
+
+```bash
+curl -X POST "http://localhost:5000/api/v1/students" \
+  -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "email": "jane.smith@example.com",
+    "dateOfBirth": "2002-08-20",
+    "phoneNumber": "+1234567890",
+    "course": "Data Science",
+    "enrollmentDate": "2024-09-01",
+    "isActive": true
+  }'
+```
+
+---
+
+## Automated Test Suite
+
+The solution includes an extensive automated test project (`tests/StudentManagement.UnitTests`) containing **81 unit tests** with a **100% pass rate**.
 
 ```
-Test Run Summary:
-========================================================================================
+Test Execution Summary:
+----------------------------------------------------------------------------------------
 Total Tests : 81
 Passed      : 81
 Failed      : 0
 Skipped     : 0
-Duration    : ~1.5s
-Framework   : xUnit, Moq, FluentAssertions, EF Core In-Memory
-========================================================================================
+Tooling     : xUnit, Moq, FluentAssertions, EF Core In-Memory Database
+----------------------------------------------------------------------------------------
 ```
 
-### Covered Test Categories:
-- **Positive CRUD Operations**: Successful create, retrieve, paged query, update, and delete.
-- **Negative & Edge Cases**:
-  - `400 Bad Request`: Payload validation failures (names, emails, age boundaries, phone regex, invalid roles).
-  - `401 Unauthorized`: Missing tokens, expired tokens, invalid credentials, account lockouts.
-  - `404 Not Found`: Non-existent entity queries and deletions.
-  - `409 Conflict`: Duplicate email handling on insert and update.
-  - `500 Server Error`: Graceful handling and sanitized problem details upon unexpected database or server faults.
-- **Security Tests**: Cryptographic token generation, token rotation, token reuse attack detection, and role verification.
+### Test Coverage Highlights
+- **Command & Query Handlers**: Complete CRUD coverage for student operations and authentication workflows.
+- **FluentValidation Rules**: Positive and edge-case validation checks (boundary ages, phone formats, required fields).
+- **Security & Token Services**: Cryptographic token generation, refresh token rotation, token reuse detection, and role assignment validation.
+- **Generic Repository & Unit of Work**: In-memory database integration tests verifying transactional integrity and queries.
+- **Global Exception Middleware**: Verification of status codes and sanitized responses for unexpected exceptions.
 
----
-
-## 🚀 Getting Started
-
-### 1. Prerequisites
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- SQL Server or SQL Server LocalDB (`(localdb)\mssqllocaldb`)
-
-### 2. Clone Repository
-```bash
-git clone https://github.com/harshalsonar-dev/StudentManagementAPI.git
-cd StudentManagementAPI
-```
-
-### 3. Run Database Migrations
-Migrations are applied automatically at startup. To run them manually via CLI:
-```powershell
-dotnet ef database update --project "src/StudentManagement.Infrastructure" --startup-project "src/StudentManagement.API"
-```
-
-### 4. Run the API Server
-```powershell
-dotnet run --project "src/StudentManagement.API"
-```
-
-### 5. Access Interactive Documentation
-Open your browser and navigate to:
-👉 **[http://localhost:5000](http://localhost:5000)** *(Swagger UI)*
-
-### 6. Run Automated Tests
+To run all automated tests:
 ```powershell
 dotnet test
 ```
 
-### 7. Direct HTTP File Testing
-You can execute pre-configured requests directly in VS Code (REST Client) or Visual Studio using [`StudentManagementEnterprise.http`](file:///e:/New%20folder/My_Project/StudentManagementAPI/src/StudentManagement.API/StudentManagementEnterprise.http).
-
 ---
 
-## 📄 License
-This project is open-source and available under the [MIT License](LICENSE).
+## Local Setup & Development
+
+### Prerequisites
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- SQL Server or SQL Server LocalDB (`(localdb)\mssqllocaldb`)
+
+### Steps to Run
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/harshalsonar-dev/StudentManagementAPI.git
+   cd StudentManagementAPI
+   ```
+2. **Build the solution:**
+   ```powershell
+   dotnet build
+   ```
+3. **Execute database migrations (optional, applied automatically on launch):**
+   ```powershell
+   dotnet ef database update --project "src/StudentManagement.Infrastructure" --startup-project "src/StudentManagement.API"
+   ```
+4. **Start the API:**
+   ```powershell
+   dotnet run --project "src/StudentManagement.API"
+   ```
+5. **Explore Swagger UI:**
+   Navigate to [http://localhost:5000](http://localhost:5000) in your web browser.
