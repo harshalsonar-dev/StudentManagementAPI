@@ -25,10 +25,6 @@ namespace StudentManagement.Application.Features.Auth.Commands.Register
                 .Matches(@"[a-z]").WithMessage("Password must contain at least one lowercase letter.")
                 .Matches(@"[0-9]").WithMessage("Password must contain at least one digit.")
                 .Matches(@"[\!\?\*\@\#\$\%\^\&\+\=]").WithMessage("Password must contain at least one special character.");
-
-            RuleFor(x => x.Dto.Role)
-                .Must(role => string.IsNullOrEmpty(role) || AppRoles.All.Contains(role))
-                .WithMessage($"Role must be one of: {string.Join(", ", AppRoles.All)}");
         }
     }
 
@@ -43,7 +39,8 @@ namespace StudentManagement.Application.Features.Auth.Commands.Register
 
         public async Task<ApiResponse<string>> Handle(RegisterCommand request, CancellationToken cancellationToken)
         {
-            var role = string.IsNullOrWhiteSpace(request.Dto.Role) ? AppRoles.Student : request.Dto.Role.Trim();
+            // Public registration is strictly restricted to the Student role to prevent privilege escalation
+            var role = AppRoles.Student;
 
             var (succeeded, _, errors) = await _identityService.CreateUserAsync(
                 request.Dto.Email.Trim(),

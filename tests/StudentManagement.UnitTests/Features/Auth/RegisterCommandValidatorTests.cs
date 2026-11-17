@@ -16,8 +16,7 @@ namespace StudentManagement.UnitTests.Features.Auth
             {
                 Email = "test@enterprise.edu",
                 Password = "ValidPassword123!",
-                FullName = "Test User",
-                Role = "Student"
+                FullName = "Test User"
             });
 
             var result = _validator.Validate(command);
@@ -113,22 +112,6 @@ namespace StudentManagement.UnitTests.Features.Auth
 
             result.IsValid.Should().BeFalse();
             result.Errors.Should().Contain(e => e.ErrorMessage.Contains("special character"));
-        }
-
-        [Fact]
-        public void Validate_InvalidRole_ShouldFail()
-        {
-            var command = new RegisterCommand(new RegisterRequestDto
-            {
-                Email = "test@enterprise.edu",
-                Password = "ValidPassword123!",
-                Role = "SuperHacker" // Not in AppRoles.All
-            });
-
-            var result = _validator.Validate(command);
-
-            result.IsValid.Should().BeFalse();
-            result.Errors.Should().Contain(e => e.PropertyName == "Dto.Role");
         }
     }
 }

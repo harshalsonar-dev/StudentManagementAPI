@@ -31,6 +31,11 @@ try
 
     // 🔹 4. Secure CORS Configuration
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+    if (!builder.Environment.IsDevelopment() && allowedOrigins.Length == 0)
+    {
+        throw new InvalidOperationException("Cors:AllowedOrigins must be configured with explicit origins in non-development environments.");
+    }
+
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("EnterpriseCorsPolicy", policy =>
@@ -44,7 +49,8 @@ try
             }
             else
             {
-                policy.AllowAnyOrigin()
+                // Safe development default origins (no wildcard, no credentials)
+                policy.WithOrigins("http://localhost:3000", "http://localhost:4200", "http://localhost:5173")
                       .AllowAnyHeader()
                       .AllowAnyMethod();
             }

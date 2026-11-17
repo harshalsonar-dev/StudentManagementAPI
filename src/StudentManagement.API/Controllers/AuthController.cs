@@ -31,9 +31,9 @@ namespace StudentManagement.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status409Conflict)]
-        public async Task<IActionResult> Register([FromBody] RegisterRequestDto dto)
+        public async Task<IActionResult> Register([FromBody] RegisterRequestDto dto, CancellationToken cancellationToken)
         {
-            var response = await Mediator.Send(new RegisterCommand(dto));
+            var response = await Mediator.Send(new RegisterCommand(dto), cancellationToken);
             return Ok(response);
         }
 
@@ -43,9 +43,9 @@ namespace StudentManagement.API.Controllers
         [HttpPost("login")]
         [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
+        public async Task<IActionResult> Login([FromBody] LoginRequestDto dto, CancellationToken cancellationToken)
         {
-            var response = await Mediator.Send(new LoginCommand(dto));
+            var response = await Mediator.Send(new LoginCommand(dto), cancellationToken);
             return Ok(response);
         }
 
@@ -55,9 +55,9 @@ namespace StudentManagement.API.Controllers
         [HttpPost("refresh-token")]
         [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<AuthResponseDto>), StatusCodes.Status401Unauthorized)]
-        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto dto)
+        public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto dto, CancellationToken cancellationToken)
         {
-            var response = await Mediator.Send(new RefreshTokenCommand(dto));
+            var response = await Mediator.Send(new RefreshTokenCommand(dto), cancellationToken);
             return Ok(response);
         }
 
@@ -67,9 +67,9 @@ namespace StudentManagement.API.Controllers
         [HttpPost("revoke-token")]
         [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> RevokeToken([FromBody] RevokeTokenRequestDto dto)
+        public async Task<IActionResult> RevokeToken([FromBody] RevokeTokenRequestDto dto, CancellationToken cancellationToken)
         {
-            var response = await Mediator.Send(new RevokeTokenCommand(dto.RefreshToken));
+            var response = await Mediator.Send(new RevokeTokenCommand(dto.RefreshToken), cancellationToken);
             return Ok(response);
         }
 
@@ -82,7 +82,7 @@ namespace StudentManagement.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> AssignRole([FromBody] AssignRoleDto dto)
+        public async Task<IActionResult> AssignRole([FromBody] AssignRoleDto dto, CancellationToken cancellationToken)
         {
             if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Role))
             {
@@ -95,7 +95,7 @@ namespace StudentManagement.API.Controllers
                 return BadRequest(ApiResponse<string>.FailureResult($"Role '{dto.Role}' is invalid. Allowed roles: {string.Join(", ", AppRoles.All)}"));
             }
 
-            var succeeded = await _identityService.AssignRoleAsync(dto.Email.Trim(), targetRole);
+            var succeeded = await _identityService.AssignRoleAsync(dto.Email.Trim(), targetRole, cancellationToken);
             if (!succeeded)
             {
                 return NotFound(ApiResponse<string>.FailureResult($"User with email '{dto.Email}' was not found."));
@@ -111,9 +111,9 @@ namespace StudentManagement.API.Controllers
         [DisableRateLimiting]
         [HttpGet("roles")]
         [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<string>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetRoles()
+        public async Task<IActionResult> GetRoles(CancellationToken cancellationToken)
         {
-            var roles = await _identityService.GetAllRolesAsync();
+            var roles = await _identityService.GetAllRolesAsync(cancellationToken);
             return Ok(ApiResponse<IReadOnlyList<string>>.SuccessResult(roles, "Roles retrieved."));
         }
 

@@ -1,67 +1,67 @@
-# Student Management Enterprise API (.NET 8)
+# Student Management Enterprise API (.NET 8 / 9 / 10 CI)
 
-An enterprise-grade RESTful API for student management built with C# and .NET 8, applying Clean Architecture, CQRS with MediatR, Entity Framework Core with SQL Server, ASP.NET Core Identity, and JWT authentication with cryptographic refresh tokens.
+A production-ready, highly secure, and scalable **Enterprise REST API** for Student Management, built with **C#**, **Clean Architecture**, **CQRS with MediatR**, **Entity Framework Core**, **SQL Server**, **ASP.NET Core Identity**, and **JWT Authentication with Cryptographic Refresh Token Hashing**.
 
 ---
 
-## Architecture Overview
+## 🏗️ Architecture Overview
 
-The solution adheres to Clean Architecture principles, ensuring clear separation of concerns, decoupling from frameworks, and high testability:
+The solution adheres strictly to Clean Architecture principles, ensuring clear separation of concerns, decoupling from external frameworks, and high testability:
 
 - **Domain Layer (`src/StudentManagement.Domain`)**
   - Contains core business entities (`Student`, `RefreshToken`).
-  - Defines shared abstractions (`BaseEntity`), application roles (`AppRoles`), domain-specific exceptions, and repository contracts (`IStudentRepository`, `IGenericRepository`, `IUnitOfWork`).
-  - Free of external dependencies or framework couplings.
+  - Defines shared abstractions (`BaseEntity`), system roles (`AppRoles`), domain-specific exceptions, and repository contracts (`IStudentRepository`, `IGenericRepository`, `IUnitOfWork`).
+  - Completely free of external dependencies or framework couplings.
 
 - **Application Layer (`src/StudentManagement.Application`)**
-  - Implements CQRS command and query handlers via MediatR.
-  - Request validation using FluentValidation rules integrated directly into the pipeline (`ValidationBehavior`).
-  - Cross-cutting concerns such as performance and telemetry logging (`LoggingBehavior`).
+  - Implements CQRS command and query handlers via **MediatR**.
+  - Request validation using **FluentValidation** integrated into the pipeline (`ValidationBehavior`).
+  - Telemetry and performance logging behavior (`LoggingBehavior`).
   - Standardized API envelope models (`ApiResponse<T>`), pagination structures (`PagedResult<T>`, `PaginationParameters`), and Data Transfer Objects (DTOs).
 
 - **Infrastructure Layer (`src/StudentManagement.Infrastructure`)**
   - EF Core database context (`ApplicationDbContext`) and migrations.
   - Implementation of Generic Repository and Unit of Work with transaction management.
   - ASP.NET Core Identity integration (`IdentityService`) for secure password hashing and account lockout.
-  - Token service (`TokenService`) for HMAC-SHA256 JWT generation and secure 64-byte cryptographic refresh token rotation.
-  - Automated database migration and initial administrator seeding (`DbSeeder`).
+  - Cryptographic token service (`TokenService`) implementing HMAC-SHA256 JWT access tokens and 64-byte random refresh tokens **stored as SHA-256 hashes at rest**.
+  - Secure administrator seeding via `IConfiguration` without hardcoded passwords (`DbSeeder`).
 
 - **API Presentation Layer (`src/StudentManagement.API`)**
-  - Thin API controllers deriving from `ApiControllerBase`.
+  - Thin API controllers deriving from `ApiControllerBase` with full `CancellationToken` propagation.
   - Global exception middleware (`GlobalExceptionHandlingMiddleware`) providing uniform JSON responses across all status codes.
-  - Rate limiting policies (fixed-window limiters for authentication and general endpoints).
-  - Structured application logging with Serilog (Console and daily rolling file sinks).
+  - Fixed-window rate limiting policies (10 req/min auth, 100 req/min general).
+  - Structured application logging with **Serilog** (Console and 14-day rolling file sink).
+  - Production-hardened CORS policies (no wildcard fallback in non-development environments).
   - Interactive Swagger / OpenAPI documentation.
 
 ---
 
-## Default Administrator Credentials
+## 🔒 Security Hardening
 
-Upon first startup, the database is automatically created and seeded with default roles and an administrator account:
-
-| Field | Value |
-|---|---|
-| **Email** | `admin@studententerprise.com` |
-| **Password** | `EnterpriseAdmin@2026!` |
-| **Assigned Role** | `Admin` |
+1. **Cryptographic Refresh Token Hashing**: Refresh tokens are generated using cryptographically secure 64-byte random byte arrays and stored in the database exclusively as **SHA-256 hashes**. Plaintext tokens are never stored at rest.
+2. **Token Rotation & Hijack Detection**: Refresh tokens are rotated upon each renewal. If a previously revoked token is reused, all active tokens for that user are immediately revoked to protect against session hijacking.
+3. **Privilege Escalation Prevention**: Public registration (`POST /api/v1/auth/register`) strictly assigns the `Student` role. The `Role` field is completely omitted from the public registration DTO. Privileged roles (`Admin`, `Teacher`) can only be assigned by an authenticated administrator.
+4. **Secret Management & Zero Hardcoded Passwords**: All production connection strings, JWT signing keys, and administrator passwords have been removed from source-controlled configuration files. Secrets are managed using **ASP.NET Core User Secrets** in local development and environment variables in production.
+5. **Strict CORS Policy**: Disallows wildcard origins (`*`) whenever credentials are enabled. Non-development environments require explicit origin configuration and fail fast if missing.
+6. **Account Lockout & Password Complexity**: Enforces 8+ characters with uppercase, lowercase, numeric, and special character rules. Automatically locks accounts for 5 minutes after 5 consecutive failed login attempts.
 
 ---
 
-## API Endpoints Reference
+## 📡 API Endpoints Reference
 
-### Authentication Endpoints (`/api/v1/auth`)
+### 🔐 Authentication & Identity (`/api/v1/auth`)
 
 | Method | Endpoint | Description | Access Level |
 |---|---|---|---|
-| `POST` | `/api/v1/auth/register` | Register a new user account | Public |
+| `POST` | `/api/v1/auth/register` | Register a new student account (always assigned `Student` role) | Public |
 | `POST` | `/api/v1/auth/login` | Authenticate with email and password | Public |
 | `POST` | `/api/v1/auth/refresh-token` | Renew access token using refresh token | Public |
 | `POST` | `/api/v1/auth/revoke-token` | Revoke a refresh token | Public |
 | `GET` | `/api/v1/auth/me` | Fetch profile information of the current user | Authenticated |
 | `GET` | `/api/v1/auth/roles` | List all system roles | Admin only |
-| `POST` | `/api/v1/auth/assign-role` | Assign role (`Admin`, `Teacher`, `Student`) to a user | Admin only |
+| `POST` | `/api/v1/auth/assign-role` | Assign role (`Admin`, `Teacher`, `Student`) to an existing user | Admin only |
 
-### Student Management Endpoints (`/api/v1/students`)
+### 👨‍🎓 Student Management (`/api/v1/students`)
 
 | Method | Endpoint | Description | Access Level |
 |---|---|---|---|
@@ -74,7 +74,7 @@ Upon first startup, the database is automatically created and seeded with defaul
 
 ---
 
-## Standardized Response Envelope
+## 📦 Standardized Response Envelope
 
 All API endpoints return responses encapsulated in the unified `ApiResponse<T>` structure:
 
@@ -124,98 +124,78 @@ All API endpoints return responses encapsulated in the unified `ApiResponse<T>` 
 
 ---
 
-## Quick Start & Usage Examples
+## 🧪 Automated Testing & Quality Assurance
 
-### 1. Authenticate & Obtain JWT Token
-
-```bash
-curl -X POST "http://localhost:5000/api/v1/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "admin@studententerprise.com",
-    "password": "EnterpriseAdmin@2026!"
-  }'
-```
-
-### 2. Query Students (with Search, Filter, Sort & Pagination)
-
-```bash
-curl -X GET "http://localhost:5000/api/v1/students?pageNumber=1&pageSize=10&searchTerm=John&course=Computer%20Science&sortBy=LastName&isAscending=true" \
-  -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>"
-```
-
-### 3. Create a New Student
-
-```bash
-curl -X POST "http://localhost:5000/api/v1/students" \
-  -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "firstName": "Jane",
-    "lastName": "Smith",
-    "email": "jane.smith@example.com",
-    "dateOfBirth": "2002-08-20",
-    "phoneNumber": "+1234567890",
-    "course": "Data Science",
-    "enrollmentDate": "2024-09-01",
-    "isActive": true
-  }'
-```
-
----
-
-## Automated Test Suite
-
-The solution includes an extensive automated test project (`tests/StudentManagement.UnitTests`) containing **81 unit tests** with a **100% pass rate**.
+The solution includes an automated test suite containing **90 unit tests** with a **100% pass rate**:
 
 ```
-Test Execution Summary:
-----------------------------------------------------------------------------------------
-Total Tests : 81
-Passed      : 81
+Test Run Summary:
+========================================================================================
+Total Tests : 90
+Passed      : 90
 Failed      : 0
 Skipped     : 0
-Tooling     : xUnit, Moq, FluentAssertions, EF Core In-Memory Database
-----------------------------------------------------------------------------------------
+Frameworks  : xUnit, Moq, FluentAssertions, EF Core In-Memory Database
+========================================================================================
 ```
 
-### Test Coverage Highlights
-- **Command & Query Handlers**: Complete CRUD coverage for student operations and authentication workflows.
-- **FluentValidation Rules**: Positive and edge-case validation checks (boundary ages, phone formats, required fields).
-- **Security & Token Services**: Cryptographic token generation, refresh token rotation, token reuse detection, and role assignment validation.
-- **Generic Repository & Unit of Work**: In-memory database integration tests verifying transactional integrity and queries.
-- **Global Exception Middleware**: Verification of status codes and sanitized responses for unexpected exceptions.
-
-To run all automated tests:
-```powershell
-dotnet test
-```
+### Test Coverage Highlights:
+- **Registration Security**: Verification that public registration assigns only `Student` role and rejects role escalation attempts.
+- **Refresh Token Hashing**: Verification that tokens in the database are hashed with SHA-256 and never stored in plaintext.
+- **Token Rotation & Revocation**: Verification of token rotation on refresh and immediate revocation of all user tokens upon replay attacks.
+- **JWT Cryptographic Verification**: Signature tampering detection, issuer validation, audience validation, and expired token handling.
+- **Full CRUD & Validation**: Validations across student creation, boundary age checks, email uniqueness, course statistics, and paginated queries.
+- **Global Exception Middleware**: Status code mapping and production sanitization for unexpected exceptions.
 
 ---
 
-## Local Setup & Development
+## 🚀 Local Setup & Configuration
 
-### Prerequisites
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+### 1. Prerequisites
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
 - SQL Server or SQL Server LocalDB (`(localdb)\mssqllocaldb`)
 
-### Steps to Run
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/harshalsonar-dev/StudentManagementAPI.git
-   cd StudentManagementAPI
-   ```
-2. **Build the solution:**
-   ```powershell
-   dotnet build
-   ```
-3. **Execute database migrations (optional, applied automatically on launch):**
-   ```powershell
-   dotnet ef database update --project "src/StudentManagement.Infrastructure" --startup-project "src/StudentManagement.API"
-   ```
-4. **Start the API:**
-   ```powershell
-   dotnet run --project "src/StudentManagement.API"
-   ```
-5. **Explore Swagger UI:**
-   Navigate to [http://localhost:5000](http://localhost:5000) in your web browser.
+### 2. Clone Repository
+```bash
+git clone https://github.com/harshalsonar-dev/StudentManagementAPI.git
+cd StudentManagementAPI
+```
+
+### 3. Configure User Secrets (Local Development)
+Set your local development secrets:
+```powershell
+cd src/StudentManagement.API
+dotnet user-secrets set "Jwt:Key" "YourDevelopmentSuperSecretSigningKeyAtLeast32BytesLong!"
+dotnet user-secrets set "InitialAdmin:Email" "admin@studententerprise.local"
+dotnet user-secrets set "InitialAdmin:Password" "Admin@YourSecurePass2026!"
+cd ../..
+```
+
+### 4. Build Solution
+```powershell
+dotnet build StudentManagementSystem.sln --configuration Release
+```
+
+### 5. Run Automated Tests
+```powershell
+dotnet test StudentManagementSystem.sln --configuration Release
+```
+
+### 6. Run the API Server
+```powershell
+dotnet run --project "src/StudentManagement.API"
+```
+
+### 7. Interactive API Documentation
+Open your browser and navigate to:
+👉 **[http://localhost:5000](http://localhost:5000)** *(Swagger UI)*
+
+---
+
+## ⚙️ Continuous Integration (GitHub Actions)
+
+Every push and pull request to the `main` branch is automatically verified using the GitHub Actions workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+- Restores dependencies
+- Builds the complete solution in Release configuration
+- Executes all 90 automated unit tests
+- Enforces zero compiler errors or test failures

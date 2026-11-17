@@ -66,16 +66,13 @@ namespace StudentManagementSystem.Controllers
                 return BadRequest(ApiResponse<string>.FailureResult("User registration failed.", errors));
             }
 
-            // Assign default role
-            var targetRole = string.IsNullOrWhiteSpace(request.Role) ? "Student" : request.Role.Trim();
-            if (await _roleManager.RoleExistsAsync(targetRole))
+            // Public registration is restricted strictly to Student role to prevent privilege escalation
+            const string defaultRole = "Student";
+            if (!await _roleManager.RoleExistsAsync(defaultRole))
             {
-                await _userManager.AddToRoleAsync(user, targetRole);
+                await _roleManager.CreateAsync(new IdentityRole(defaultRole));
             }
-            else
-            {
-                await _userManager.AddToRoleAsync(user, "Student");
-            }
+            await _userManager.AddToRoleAsync(user, defaultRole);
 
             _logger.LogInformation("New user registered: {Email}", email);
             return Ok(ApiResponse<string>.SuccessResult("User registered successfully."));

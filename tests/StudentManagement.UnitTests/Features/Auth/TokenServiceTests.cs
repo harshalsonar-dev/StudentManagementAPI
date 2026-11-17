@@ -51,7 +51,7 @@ namespace StudentManagement.UnitTests.Features.Auth
         }
 
         [Fact]
-        public async Task GenerateTokensAsync_ShouldReturnValidTokens_AndPersistRefreshToken()
+        public async Task GenerateTokensAsync_ShouldReturnValidTokens_AndPersistHashedRefreshToken()
         {
             // Arrange
             var userId = "user-100";
@@ -69,10 +69,12 @@ namespace StudentManagement.UnitTests.Features.Auth
             response.Email.Should().Be(email);
             response.Roles.Should().Contain(AppRoles.Student);
 
-            // Verify stored in DB
-            var storedToken = await _context.RefreshTokens.FirstOrDefaultAsync(t => t.Token == response.RefreshToken);
+            // Verify stored in DB as SHA-256 hash (never plaintext)
+            var expectedHash = TokenService.HashToken(response.RefreshToken);
+            var storedToken = await _context.RefreshTokens.FirstOrDefaultAsync(t => t.Token == expectedHash);
             storedToken.Should().NotBeNull();
-            storedToken!.UserId.Should().Be(userId);
+            storedToken!.Token.Should().NotBe(response.RefreshToken); // Proves plaintext token is not stored
+            storedToken.UserId.Should().Be(userId);
             storedToken.IsRevoked.Should().BeFalse();
             storedToken.IsExpired.Should().BeFalse();
 
@@ -112,14 +114,16 @@ namespace StudentManagement.UnitTests.Features.Auth
             newTokens.AccessToken.Should().NotBe(initialTokens.AccessToken);
             newTokens.RefreshToken.Should().NotBe(initialTokens.RefreshToken);
 
-            // Verify old token is revoked
-            var oldToken = await _context.RefreshTokens.FirstOrDefaultAsync(t => t.Token == initialTokens.RefreshToken);
+            // Verify old token is revoked in DB
+            var oldHash = TokenService.HashToken(initialTokens.RefreshToken);
+            var oldToken = await _context.RefreshTokens.FirstOrDefaultAsync(t => t.Token == oldHash);
             oldToken.Should().NotBeNull();
             oldToken!.IsRevoked.Should().BeTrue();
-            oldToken.ReplacedByToken.Should().Be(newTokens.RefreshToken);
+            oldToken.ReplacedByToken.Should().Be(TokenService.HashToken(newTokens.RefreshToken));
 
-            // Verify new token exists in DB and is active
-            var activeNewToken = await _context.RefreshTokens.FirstOrDefaultAsync(t => t.Token == newTokens.RefreshToken);
+            // Verify new token exists in DB as hash and is active
+            var newHash = TokenService.HashToken(newTokens.RefreshToken);
+            var activeNewToken = await _context.RefreshTokens.FirstOrDefaultAsync(t => t.Token == newHash);
             activeNewToken.Should().NotBeNull();
             activeNewToken!.IsActive.Should().BeTrue();
         }
@@ -132,7 +136,8 @@ namespace StudentManagement.UnitTests.Features.Auth
             var initialTokens = await _tokenService.GenerateTokensAsync(userId, "victim@enterprise.edu", "victim", new List<string> { AppRoles.Student });
 
             // Manually revoke the token
-            var tokenInDb = await _context.RefreshTokens.FirstAsync(t => t.Token == initialTokens.RefreshToken);
+            var tokenHash = TokenService.HashToken(initialTokens.RefreshToken);
+            var tokenInDb = await _context.RefreshTokens.FirstAsync(t => t.Token == tokenHash);
             tokenInDb.RevokedOnUtc = DateTime.UtcNow;
             await _context.SaveChangesAsync();
 
@@ -151,7 +156,8 @@ namespace StudentManagement.UnitTests.Features.Auth
             var initialTokens = await _tokenService.GenerateTokensAsync(userId, "exp@enterprise.edu", "exp", new List<string> { AppRoles.Student });
 
             // Set expiration in past
-            var tokenInDb = await _context.RefreshTokens.FirstAsync(t => t.Token == initialTokens.RefreshToken);
+            var tokenHash = TokenService.HashToken(initialTokens.RefreshToken);
+            var tokenInDb = await _context.RefreshTokens.FirstAsync(t => t.Token == tokenHash);
             tokenInDb.ExpiresOnUtc = DateTime.UtcNow.AddMinutes(-10);
             await _context.SaveChangesAsync();
 
@@ -160,6 +166,33 @@ namespace StudentManagement.UnitTests.Features.Auth
 
             await act.Should().ThrowAsync<UnauthorizedAppException>()
                      .WithMessage("*expired*");
+        }
+
+        [Fact]
+        public async Task RevokeRefreshTokenAsync_ValidToken_ShouldMarkTokenAsRevoked()
+        {
+            // Arrange
+            var userId = "user-revoke-test";
+            var tokens = await _tokenService.GenerateTokensAsync(userId, "revoke@enterprise.edu", "revoke", new List<string> { AppRoles.Student });
+
+            // Act
+            var result = await _tokenService.RevokeRefreshTokenAsync(tokens.RefreshToken);
+
+            // Assert
+            result.Should().BeTrue();
+            var hash = TokenService.HashToken(tokens.RefreshToken);
+            var tokenInDb = await _context.RefreshTokens.FirstAsync(t => t.Token == hash);
+            tokenInDb.IsRevoked.Should().BeTrue();
+        }
+
+        [Fact]
+        public void GetPrincipalFromExpiredToken_InvalidMalformedToken_ShouldReturnNull()
+        {
+            // Act
+            var result = _tokenService.GetPrincipalFromExpiredToken("this.is.a.malformed.jwt.token");
+
+            // Assert
+            result.Should().BeNull();
         }
 
         public void Dispose()

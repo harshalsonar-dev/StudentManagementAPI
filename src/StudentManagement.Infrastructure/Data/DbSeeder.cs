@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StudentManagement.Domain.Entities;
 using StudentManagement.Domain.Enums;
@@ -17,11 +19,16 @@ namespace StudentManagement.Infrastructure.Data
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<ApplicationDbContext>>();
+            var config = scope.ServiceProvider.GetService<IConfiguration>();
+            var env = scope.ServiceProvider.GetService<IHostEnvironment>();
 
             try
             {
-                // Auto migrate
-                await context.Database.MigrateAsync();
+                // In Development, ensure database schema is created
+                if (env == null || env.IsDevelopment())
+                {
+                    await context.Database.MigrateAsync();
+                }
 
                 // 1. Seed Roles
                 foreach (var role in AppRoles.All)
@@ -33,29 +40,43 @@ namespace StudentManagement.Infrastructure.Data
                     }
                 }
 
-                // 2. Seed Default Admin
-                var adminEmail = "admin@studententerprise.com";
-                var adminUser = await userManager.FindByEmailAsync(adminEmail);
-                if (adminUser == null)
-                {
-                    adminUser = new ApplicationUser
-                    {
-                        UserName = adminEmail,
-                        Email = adminEmail,
-                        FullName = "System Administrator",
-                        EmailConfirmed = true
-                    };
+                // 2. Seed Initial Admin if securely configured
+                var adminEmail = config?["InitialAdmin:Email"]?.Trim();
+                var adminPassword = config?["InitialAdmin:Password"]?.Trim();
 
-                    var result = await userManager.CreateAsync(adminUser, "EnterpriseAdmin@2026!");
-                    if (result.Succeeded)
+                if (!string.IsNullOrWhiteSpace(adminEmail) && !string.IsNullOrWhiteSpace(adminPassword))
+                {
+                    var adminUser = await userManager.FindByEmailAsync(adminEmail);
+                    if (adminUser == null)
                     {
-                        await userManager.AddToRoleAsync(adminUser, AppRoles.Admin);
-                        logger.LogInformation("Default Enterprise Admin user created: {AdminEmail}", adminEmail);
+                        adminUser = new ApplicationUser
+                        {
+                            UserName = adminEmail,
+                            Email = adminEmail,
+                            FullName = "System Administrator",
+                            EmailConfirmed = true
+                        };
+
+                        var result = await userManager.CreateAsync(adminUser, adminPassword);
+                        if (result.Succeeded)
+                        {
+                            await userManager.AddToRoleAsync(adminUser, AppRoles.Admin);
+                            logger.LogInformation("Initial administrator user created successfully from configuration.");
+                        }
+                        else
+                        {
+                            var errors = string.Join("; ", result.Errors.Select(e => e.Description));
+                            logger.LogWarning("Failed to create initial administrator: {Errors}", errors);
+                        }
                     }
                 }
+                else
+                {
+                    logger.LogInformation("No InitialAdmin credentials found in configuration. Skipping initial administrator seeding.");
+                }
 
-                // 3. Seed Sample Students if empty
-                if (!await context.Students.AnyAsync())
+                // 3. Seed Sample Students in Development environment if database is empty
+                if ((env == null || env.IsDevelopment()) && !await context.Students.AnyAsync())
                 {
                     var students = new List<Student>
                     {
@@ -93,7 +114,7 @@ namespace StudentManagement.Infrastructure.Data
 
                     await context.Students.AddRangeAsync(students);
                     await context.SaveChangesAsync();
-                    logger.LogInformation("Sample student records seeded.");
+                    logger.LogInformation("Sample student records seeded for development.");
                 }
             }
             catch (Exception ex)

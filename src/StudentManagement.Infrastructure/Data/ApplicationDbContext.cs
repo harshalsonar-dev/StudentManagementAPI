@@ -37,6 +37,7 @@ namespace StudentManagement.Infrastructure.Data
                 entity.Property(e => e.Token).IsRequired().HasMaxLength(256);
                 entity.HasIndex(e => e.Token).IsUnique();
                 entity.Property(e => e.UserId).IsRequired().HasMaxLength(450);
+                entity.HasIndex(e => e.UserId);
                 entity.Property(e => e.JwtId).IsRequired().HasMaxLength(100);
             });
         }

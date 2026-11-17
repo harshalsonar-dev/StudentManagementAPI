@@ -21,15 +21,14 @@ namespace StudentManagement.UnitTests.Features.Auth
         }
 
         [Fact]
-        public async Task Handle_ValidRegistration_ShouldReturnSuccess()
+        public async Task Handle_ValidRegistration_ShouldReturnSuccessAndAssignStudentRole()
         {
             // Arrange
             var registerDto = new RegisterRequestDto
             {
                 Email = "newstudent@enterprise.edu",
                 Password = "Password123!",
-                FullName = "New Student",
-                Role = AppRoles.Student
+                FullName = "New Student"
             };
             var command = new RegisterCommand(registerDto);
 
@@ -44,33 +43,39 @@ namespace StudentManagement.UnitTests.Features.Auth
             result.Should().NotBeNull();
             result.Success.Should().BeTrue();
             result.Data.Should().Contain("User registered successfully");
+
+            _identityServiceMock.Verify(
+                i => i.CreateUserAsync(registerDto.Email, registerDto.Password, registerDto.FullName, AppRoles.Student, It.IsAny<CancellationToken>()),
+                Times.Once);
         }
 
         [Fact]
-        public async Task Handle_ValidRegistration_WithTeacherRole_ShouldAssignTeacherRole()
+        public async Task Handle_Registration_MustNeverAssignPrivilegedRolesDirectly()
         {
             // Arrange
             var registerDto = new RegisterRequestDto
             {
-                Email = "teacher@enterprise.edu",
-                Password = "TeacherPassword123!",
-                FullName = "Prof. Smith",
-                Role = AppRoles.Teacher
+                Email = "someone@enterprise.edu",
+                Password = "Password123!",
+                FullName = "Someone"
             };
             var command = new RegisterCommand(registerDto);
 
             _identityServiceMock
-                .Setup(i => i.CreateUserAsync(registerDto.Email, registerDto.Password, registerDto.FullName, AppRoles.Teacher, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((true, "teacher-id", Enumerable.Empty<string>()));
+                .Setup(i => i.CreateUserAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), AppRoles.Student, It.IsAny<CancellationToken>()))
+                .ReturnsAsync((true, "student-id", Enumerable.Empty<string>()));
 
             // Act
             var result = await _handler.Handle(command, CancellationToken.None);
 
-            // Assert
+            // Assert: verify that Admin and Teacher roles were NEVER requested
             result.Success.Should().BeTrue();
             _identityServiceMock.Verify(
-                i => i.CreateUserAsync(registerDto.Email, registerDto.Password, registerDto.FullName, AppRoles.Teacher, It.IsAny<CancellationToken>()),
-                Times.Once);
+                i => i.CreateUserAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), AppRoles.Admin, It.IsAny<CancellationToken>()),
+                Times.Never);
+            _identityServiceMock.Verify(
+                i => i.CreateUserAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), AppRoles.Teacher, It.IsAny<CancellationToken>()),
+                Times.Never);
         }
 
         [Fact]

@@ -13,7 +13,5 @@ namespace StudentManagementSystem.Models
         public string Password { get; set; } = string.Empty;
 
         public string? FullName { get; set; }
-
-        public string? Role { get; set; } = "Student"; // "Admin", "Teacher", "Student"
     }
 }

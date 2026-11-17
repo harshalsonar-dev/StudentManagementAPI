@@ -1,16 +1,19 @@
-## Visual Studio / VS Code
+## Visual Studio / VS Code / Rider
 .vs/
 .vscode/
+.idea/
 *.user
 *.userosscache
 *.sln.docstates
 *.suo
+*.DotSettings.user
 
 ## Build results
 [Bb]in/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+*.log
 
 ## Test results
 TestResults/
@@ -19,3 +22,5 @@ TestResults/
 ## User secrets & OS files
 .DS_Store
 Thumbs.db
+secrets.json
+appsettings.*.local.json

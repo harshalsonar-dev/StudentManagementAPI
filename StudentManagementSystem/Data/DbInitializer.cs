@@ -1,5 +1,9 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using StudentManagementSystem.Models;
 
 namespace StudentManagementAPI.Data
@@ -12,11 +16,15 @@ namespace StudentManagementAPI.Data
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
             var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+            var config = scope.ServiceProvider.GetService<IConfiguration>();
+            var env = scope.ServiceProvider.GetService<IHostEnvironment>();
 
             try
             {
-                // Ensure database is created and up to date
-                await context.Database.MigrateAsync();
+                if (env == null || env.IsDevelopment())
+                {
+                    await context.Database.MigrateAsync();
+                }
 
                 // 1. Seed Roles
                 string[] roleNames = { "Admin", "Teacher", "Student" };
@@ -29,33 +37,42 @@ namespace StudentManagementAPI.Data
                     }
                 }
 
-                // 2. Seed Default Admin User
-                var adminEmail = "admin@studentapi.com";
-                var adminUser = await userManager.FindByEmailAsync(adminEmail);
-                if (adminUser == null)
-                {
-                    adminUser = new IdentityUser
-                    {
-                        UserName = adminEmail,
-                        Email = adminEmail,
-                        EmailConfirmed = true
-                    };
+                // 2. Seed Initial Admin User if configured
+                var adminEmail = config?["InitialAdmin:Email"]?.Trim();
+                var adminPassword = config?["InitialAdmin:Password"]?.Trim();
 
-                    var result = await userManager.CreateAsync(adminUser, "Admin@123456");
-                    if (result.Succeeded)
+                if (!string.IsNullOrWhiteSpace(adminEmail) && !string.IsNullOrWhiteSpace(adminPassword))
+                {
+                    var adminUser = await userManager.FindByEmailAsync(adminEmail);
+                    if (adminUser == null)
                     {
-                        await userManager.AddToRoleAsync(adminUser, "Admin");
-                        logger.LogInformation("Default Admin user created successfully with email: {AdminEmail}", adminEmail);
-                    }
-                    else
-                    {
-                        var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                        logger.LogError("Failed to create default Admin user: {Errors}", errors);
+                        adminUser = new IdentityUser
+                        {
+                            UserName = adminEmail,
+                            Email = adminEmail,
+                            EmailConfirmed = true
+                        };
+
+                        var result = await userManager.CreateAsync(adminUser, adminPassword);
+                        if (result.Succeeded)
+                        {
+                            await userManager.AddToRoleAsync(adminUser, "Admin");
+                            logger.LogInformation("Configured Admin user created successfully with email: {AdminEmail}", adminEmail);
+                        }
+                        else
+                        {
+                            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                            logger.LogError("Failed to create configured Admin user: {Errors}", errors);
+                        }
                     }
                 }
+                else
+                {
+                    logger.LogInformation("No InitialAdmin credentials configured. Skipping admin user creation.");
+                }
 
-                // 3. Seed Sample Students if none exist
-                if (!await context.Students.AnyAsync())
+                // 3. Seed Sample Students if in development and none exist
+                if ((env == null || env.IsDevelopment()) && !await context.Students.AnyAsync())
                 {
                     var sampleStudents = new List<Student>
                     {
@@ -103,15 +120,14 @@ namespace StudentManagementAPI.Data
 
                     await context.Students.AddRangeAsync(sampleStudents);
                     await context.SaveChangesAsync();
-                    logger.LogInformation("Sample student records seeded successfully.");
+                    logger.LogInformation("Sample students seeded successfully.");
                 }
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "An error occurred while seeding the database.");
+                logger.LogError(ex, "An error occurred while seeding the database: {Message}", ex.Message);
                 throw;
             }
         }
     }
 }
-

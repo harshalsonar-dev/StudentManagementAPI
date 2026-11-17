@@ -78,13 +78,14 @@ namespace StudentManagement.Infrastructure.Services
             var accessTokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
             // Generate cryptographically random refresh token
-            var refreshTokenString = GenerateSecureRandomToken();
+            var rawRefreshToken = GenerateSecureRandomToken();
+            var hashedRefreshToken = HashToken(rawRefreshToken);
             var refreshExpiration = DateTime.UtcNow.AddDays(refreshDurationDays);
 
             var refreshTokenEntity = new RefreshToken
             {
                 UserId = userId,
-                Token = refreshTokenString,
+                Token = hashedRefreshToken, // Stored securely as SHA-256 hash
                 JwtId = jti,
                 ExpiresOnUtc = refreshExpiration,
                 CreatedOnUtc = DateTime.UtcNow
@@ -96,7 +97,7 @@ namespace StudentManagement.Infrastructure.Services
             return new AuthResponseDto
             {
                 AccessToken = accessTokenString,
-                RefreshToken = refreshTokenString,
+                RefreshToken = rawRefreshToken, // Return raw random token to client
                 AccessTokenExpiration = accessExpiration,
                 RefreshTokenExpiration = refreshExpiration,
                 Email = email,
@@ -122,8 +123,10 @@ namespace StudentManagement.Infrastructure.Services
                 throw new UnauthorizedAppException("User identifier not present in token.");
             }
 
+            var hashedInputToken = HashToken(refreshToken);
+
             var storedRefreshToken = await _context.RefreshTokens
-                .FirstOrDefaultAsync(t => t.Token == refreshToken, cancellationToken);
+                .FirstOrDefaultAsync(t => t.Token == hashedInputToken, cancellationToken);
 
             if (storedRefreshToken == null)
             {
@@ -175,7 +178,7 @@ namespace StudentManagement.Infrastructure.Services
                 roles,
                 cancellationToken);
 
-            storedRefreshToken.ReplacedByToken = newTokens.RefreshToken;
+            storedRefreshToken.ReplacedByToken = HashToken(newTokens.RefreshToken);
             await _context.SaveChangesAsync(cancellationToken);
 
             return newTokens;
@@ -183,8 +186,10 @@ namespace StudentManagement.Infrastructure.Services
 
         public async Task<bool> RevokeRefreshTokenAsync(string refreshToken, CancellationToken cancellationToken = default)
         {
+            var hashedInputToken = HashToken(refreshToken);
+
             var token = await _context.RefreshTokens
-                .FirstOrDefaultAsync(t => t.Token == refreshToken, cancellationToken);
+                .FirstOrDefaultAsync(t => t.Token == hashedInputToken, cancellationToken);
 
             if (token == null || !token.IsActive)
             {
@@ -230,6 +235,13 @@ namespace StudentManagement.Infrastructure.Services
             {
                 return null;
             }
+        }
+
+        public static string HashToken(string token)
+        {
+            using var sha256 = SHA256.Create();
+            var bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(token));
+            return Convert.ToHexString(bytes);
         }
 
         private static string GenerateSecureRandomToken()

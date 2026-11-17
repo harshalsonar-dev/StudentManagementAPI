@@ -23,9 +23,9 @@ namespace StudentManagement.API.Controllers
         [Authorize]
         [HttpGet]
         [ProducesResponseType(typeof(ApiResponse<PagedResult<StudentDto>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAll([FromQuery] PaginationParameters parameters)
+        public async Task<IActionResult> GetAll([FromQuery] PaginationParameters parameters, CancellationToken cancellationToken)
         {
-            var response = await Mediator.Send(new GetStudentsPagedQuery(parameters));
+            var response = await Mediator.Send(new GetStudentsPagedQuery(parameters), cancellationToken);
             return Ok(response);
         }
 
@@ -36,9 +36,9 @@ namespace StudentManagement.API.Controllers
         [HttpGet("{id:int}", Name = nameof(GetById))]
         [ProducesResponseType(typeof(ApiResponse<StudentDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> GetById(int id)
+        public async Task<IActionResult> GetById(int id, CancellationToken cancellationToken)
         {
-            var response = await Mediator.Send(new GetStudentByIdQuery(id));
+            var response = await Mediator.Send(new GetStudentByIdQuery(id), cancellationToken);
             return Ok(response);
         }
 
@@ -48,9 +48,9 @@ namespace StudentManagement.API.Controllers
         [Authorize]
         [HttpGet("statistics")]
         [ProducesResponseType(typeof(ApiResponse<Dictionary<string, int>>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetStatistics()
+        public async Task<IActionResult> GetStatistics(CancellationToken cancellationToken)
         {
-            var response = await Mediator.Send(new GetCourseStatsQuery());
+            var response = await Mediator.Send(new GetCourseStatsQuery(), cancellationToken);
             return Ok(response);
         }
 
@@ -62,9 +62,9 @@ namespace StudentManagement.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<StudentDto>), StatusCodes.Status201Created)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-        public async Task<IActionResult> Create([FromBody] CreateStudentDto dto)
+        public async Task<IActionResult> Create([FromBody] CreateStudentDto dto, CancellationToken cancellationToken)
         {
-            var response = await Mediator.Send(new CreateStudentCommand(dto));
+            var response = await Mediator.Send(new CreateStudentCommand(dto), cancellationToken);
             return CreatedAtAction(nameof(GetById), new { id = response.Data!.Id }, response);
         }
 
@@ -77,9 +77,9 @@ namespace StudentManagement.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdateStudentDto dto)
+        public async Task<IActionResult> Update(int id, [FromBody] UpdateStudentDto dto, CancellationToken cancellationToken)
         {
-            var response = await Mediator.Send(new UpdateStudentCommand(id, dto));
+            var response = await Mediator.Send(new UpdateStudentCommand(id, dto), cancellationToken);
             return Ok(response);
         }
 
@@ -90,9 +90,9 @@ namespace StudentManagement.API.Controllers
         [HttpDelete("{id:int}")]
         [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-        public async Task<IActionResult> Delete(int id)
+        public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
         {
-            var response = await Mediator.Send(new DeleteStudentCommand(id));
+            var response = await Mediator.Send(new DeleteStudentCommand(id), cancellationToken);
             return Ok(response);
         }
     }
