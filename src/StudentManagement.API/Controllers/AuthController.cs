@@ -84,13 +84,24 @@ namespace StudentManagement.API.Controllers
         [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> AssignRole([FromBody] AssignRoleDto dto)
         {
-            var succeeded = await _identityService.AssignRoleAsync(dto.Email, dto.Role);
-            if (!succeeded)
+            if (string.IsNullOrWhiteSpace(dto.Email) || string.IsNullOrWhiteSpace(dto.Role))
             {
-                return BadRequest(ApiResponse<string>.FailureResult($"Failed to assign role '{dto.Role}' to '{dto.Email}'."));
+                return BadRequest(ApiResponse<string>.FailureResult("Email and role are required."));
             }
 
-            return Ok(ApiResponse<string>.SuccessResult($"Role '{dto.Role}' assigned successfully to '{dto.Email}'."));
+            var targetRole = AppRoles.All.FirstOrDefault(r => r.Equals(dto.Role.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (targetRole == null)
+            {
+                return BadRequest(ApiResponse<string>.FailureResult($"Role '{dto.Role}' is invalid. Allowed roles: {string.Join(", ", AppRoles.All)}"));
+            }
+
+            var succeeded = await _identityService.AssignRoleAsync(dto.Email.Trim(), targetRole);
+            if (!succeeded)
+            {
+                return NotFound(ApiResponse<string>.FailureResult($"User with email '{dto.Email}' was not found."));
+            }
+
+            return Ok(ApiResponse<string>.SuccessResult($"Role '{targetRole}' assigned successfully to '{dto.Email}'."));
         }
 
         /// <summary>

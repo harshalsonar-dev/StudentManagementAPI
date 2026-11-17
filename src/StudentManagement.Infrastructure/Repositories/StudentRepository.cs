@@ -57,8 +57,10 @@ namespace StudentManagement.Infrastructure.Repositories
                 _ => query.OrderBy(s => s.Name)
             };
 
-            var skip = (pageNumber - 1) * pageSize;
-            var items = await query.Skip(skip).Take(pageSize).ToListAsync(cancellationToken);
+            var page = pageNumber < 1 ? 1 : pageNumber;
+            var size = pageSize < 1 ? 10 : pageSize;
+            var skip = (page - 1) * size;
+            var items = await query.Skip(skip).Take(size).ToListAsync(cancellationToken);
 
             return (items, totalCount);
         }

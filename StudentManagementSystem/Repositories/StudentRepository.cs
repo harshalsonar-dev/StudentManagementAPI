@@ -62,12 +62,15 @@ namespace StudentManagementSystem.Repositories
                 ("createddate", true) => query.OrderBy(s => s.CreatedDate),
                 ("createddate", false) => query.OrderByDescending(s => s.CreatedDate),
                 ("name", false) => query.OrderByDescending(s => s.Name),
+                (_, false) => query.OrderByDescending(s => s.Name),
                 _ => query.OrderBy(s => s.Name)
             };
 
             // Paging
-            var skip = (queryParams.PageNumber - 1) * queryParams.PageSize;
-            var items = await query.Skip(skip).Take(queryParams.PageSize).ToListAsync();
+            var page = queryParams.PageNumber < 1 ? 1 : queryParams.PageNumber;
+            var size = queryParams.PageSize < 1 ? 10 : queryParams.PageSize;
+            var skip = (page - 1) * size;
+            var items = await query.Skip(skip).Take(size).ToListAsync();
 
             return new PagedResult<Student>(items, totalCount, queryParams.PageNumber, queryParams.PageSize);
         }

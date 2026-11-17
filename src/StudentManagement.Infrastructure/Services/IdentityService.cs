@@ -85,15 +85,21 @@ namespace StudentManagement.Infrastructure.Services
                 return false;
             }
 
-            if (!await _roleManager.RoleExistsAsync(role))
+            var validRole = Domain.Enums.AppRoles.All.FirstOrDefault(r => r.Equals(role.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (validRole == null)
             {
-                await _roleManager.CreateAsync(new IdentityRole(role));
+                return false;
+            }
+
+            if (!await _roleManager.RoleExistsAsync(validRole))
+            {
+                await _roleManager.CreateAsync(new IdentityRole(validRole));
             }
 
             var currentRoles = await _userManager.GetRolesAsync(user);
-            if (!currentRoles.Contains(role))
+            if (!currentRoles.Contains(validRole))
             {
-                var result = await _userManager.AddToRoleAsync(user, role);
+                var result = await _userManager.AddToRoleAsync(user, validRole);
                 return result.Succeeded;
             }
 
